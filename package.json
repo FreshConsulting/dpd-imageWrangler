@@ -1,6 +1,6 @@
 {
   "name": "dpd-image-wrangler",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "dependencies": {
     "gm": "~1.14.2",
     "knox": "0.7.x",
