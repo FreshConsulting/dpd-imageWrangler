@@ -4,6 +4,6 @@
   "dependencies": {
     "gm": "~1.14.2",
     "knox": "0.7.x",
-    "formidable": "1.0.x",
+    "formidable": "1.0.x"
   }
 }
