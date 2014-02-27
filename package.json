@@ -1,5 +1,5 @@
 {
-  "name": "dpd-imageWrangler",
+  "name": "dpd-image-wrangler",
   "version": "0.1.0",
   "dependencies": {
     "gm": "~1.14.2",

@@ -1,3 +1,4 @@
+/*jslint node: true */
 'use strict';
 
 /**
@@ -9,11 +10,9 @@ util = require('util'),
 formidable = require('formidable'),
 fs = require('fs'),
 path = require('path'),
-knox = require('knox')
+knox = require('knox'),
+gm = require('gm')
 ;
-
-//load graphicsMagik
-var gm = require('gm');
 
 /**
 * Module setup.
@@ -59,7 +58,10 @@ ImageWrangler.basicDashboard = {
 		}, {
 			name        : 'bucket',
 			type        : 'text',
-			description : 'Only allow internal scripts to send email'
+		}, {
+			name        : 'basePath',
+			type        : 'text',
+			description : 'base url for where someone could GET the file off the bucket (cloud front url if you are using that)'
 		}, {
 			name        : 'publicRead',
 			type        : 'checkbox',
@@ -79,8 +81,11 @@ ImageWrangler.basicDashboard = {
 ImageWrangler.prototype.handle = function ( ctx, next ) {
 	var req = ctx.req;
 	var domain = {url: ctx.url};
-	var s3Handler = this;
+	var wrangler = this;
 	var parts = ctx.url.split('/').filter(function(p) { return p; });
+	var subDirPath = '';
+	if (parts.length > 0) subDirPath = parts.join('/');
+	if (!this.config.basePath)this.config.basePath = '';
 
 	if ( !ctx.req.internal && this.config.internalOnly ) {
 		return ctx.done({ statusCode: 403, message: 'Forbidden' });
@@ -106,14 +111,17 @@ ImageWrangler.prototype.handle = function ( ctx, next ) {
 				output = lastFile.path.split('/');
 				output.pop();
 				var outputPath = output.join('/')+'/'+outputName;
+
 				gm(lastFile.path)
-				.resize(task.width, task.height)
 				.autoOrient()
+				.resize(task.width, task.height, '^')
+				.gravity('Center')
+				.extent(task.width, task.height)
 				.write(outputPath, function (err) {
 					if (!err) {
-						responseObject[task.suffix] = '/bucket/'+parts[0]+'/'+outputName;
+						responseObject[task.suffix] = wrangler.config.basePath+subDirPath+'/'+outputName;
 						var stat = fs.statSync(outputPath);
-						s3Handler.uploadFile('/'+parts[0]+'/'+outputName, stat.size, lastFile.type, fs.createReadStream(outputPath), resizeFile);
+						wrangler.uploadFile('/'+subDirPath+'/'+outputName, stat.size, lastFile.type, fs.createReadStream(outputPath), resizeFile);
 					}else{
 						console.log(' error writing: '+err);
 						ctx.done(err);
@@ -121,8 +129,6 @@ ImageWrangler.prototype.handle = function ( ctx, next ) {
 				});
 			}else{
 				if (req.headers.referer) {
-					console.log(JSON.stringify(responseObject));
-					//ctx.done(null,{'file':ctx.url, 'success':true, 'filesize':lastFile.size});
 					ctx.done(null, responseObject);
 				} else {
 					ctx.done(null, files);
@@ -133,9 +139,11 @@ ImageWrangler.prototype.handle = function ( ctx, next ) {
 		form.parse(req)
 		.on('file', function(name, file) {
 			remaining++;
-			console.log('form.parse.on: filename:'+name+' - '+JSON.stringify(file));
 			lastFile = file;
-			resizeFile();
+			//write original version to s3 for safe keeping
+			var output = file.name.split('.');
+			var outputName = output[0]+'-original.'+output[1];
+			wrangler.uploadFile('/'+subDirPath+'/'+outputName, file.size, lastFile.type, fs.createReadStream(file.path), resizeFile);
 		})
 		.on('error', function(err) {
 			ctx.done(err);
@@ -145,23 +153,7 @@ ImageWrangler.prototype.handle = function ( ctx, next ) {
 		return;
 	}
 
-	if (req.method === 'POST') {
-		console.log('in if POST');
-		domain.fileSize = ctx.req.headers['content-length'];
-		domain.fileName = path.basename(ctx.url);
-
-		if (this.events.upload) {
-			this.events.upload.run(ctx, domain, function(err) {
-				if (err){return ctx.done(err);}
-				s3Handler.upload(ctx, next);
-			});
-		} else {
-			this.upload(ctx, next);
-		}
-
-	} else {
-		next();
-	}
+	next();
 };
 
 ImageWrangler.prototype.uploadFile = function(filename, filesize, mime, stream, fn) {
