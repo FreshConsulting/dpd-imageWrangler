@@ -4,6 +4,10 @@ Deployd module that takes an image upload via POST and makes multiple resized ve
 
 Allows you to customize how many and what sized versions of the uploaded image are made in the config panel of the deployd resource you setup.
 
+## Install
+
+	npm install dpd-image-wrangler
+
 ## Configuration
 
 Add a resource in the deployd dashboard selecting dpd-imageWrangler and name your resource. In the config for your new resource, you'll need to supply:
