@@ -1,4 +1,4 @@
-# dpd-image-wrangler v0.2.1
+# dpd-image-wrangler v0.2.2
 
 Deployd module that takes an image upload via POST and makes multiple resized versions of it, then places them on an AWS s3 bucket
 
@@ -23,6 +23,8 @@ Add a resource in the deployd dashboard selecting dpd-imageWrangler and name you
 -	Public read access. When files are placed on your S3 bucket, automatically flag them for public read.
 -	basePath.  optionally include a base url (like your Cloud Front url) to be inlcuded with the image urls in the repsonse JSON object.
 -	Internal only.  Only allow the resource to be accessed from internal deployd requests, and not from general public requests.
+-	Image Quality.  (Default: 95) image quality setting, range 0-100
+-	Crop.  After scaling image to meet bounding width/height, should it center crop off the excess opposing width/height to ensure dimensions exactly match those defined for the resize task.
 
 ## Setting up resize tasks
 
