@@ -6,6 +6,7 @@
 */
 
 var Resource = require('deployd/lib/resource'),
+Session = require('deployd/lib/session'),
 util = require('util'),
 formidable = require('formidable'),
 fs = require('fs'),
@@ -70,6 +71,14 @@ ImageWrangler.basicDashboard = {
 			name        : 'internalOnly',
 			type        : 'checkbox',
 			description : 'Only allow internal scripts to send email'
+		}, {
+			name        : 'imageQuality',
+			type        : 'text',
+			description : '0-100 (default 95)'
+		}, {
+			name        : 'crop',
+			type        : 'checkbox',
+			description : 'center crop image if necessary'
 		}
 	]
 };
@@ -101,23 +110,42 @@ ImageWrangler.prototype.handle = function ( ctx, next ) {
 		var lastFile;
 
 		var responseObject = {};
-
+		var cleanseFilename = function(incomingFilename){
+			console.log("incoming filename: "+incomingFilename);
+			var filename = incomingFilename;
+			var extension = null;
+			if(incomingFilename.indexOf('.') != -1){
+				var pieces = incomingFilename.split('.');
+				extension = pieces.pop();
+				filename = pieces.join('.');
+			}
+			console.log("filename: "+filename);
+			console.log('extension: '+extension);
+			filename = filename.replace(/\s+/g, '-').toLowerCase(); //converst space to dash
+			console.log('replaced spaces with dashes: '+filename);
+			filename = filename.replace(/[^a-z0-9_\-]/gi, ''); // drop all other funny business
+			console.log('dropped bad characters: '+filename);
+			if(extension){
+				console.log('completed result: '+filename+'.'+extension);
+				return filename+'.'+extension;
+			}
+			return filename;
+		};
 		var resizeFile = function(){
 			if (resizeTasks.length>0) {
 				var task = resizeTasks.pop();
 				console.log('task: '+JSON.stringify(task));
-				var output = lastFile.name.split('.');
+
+				var output = cleanseFilename(lastFile.name).split('.');
 				var outputName = output[0]+'-'+task.suffix+'.'+output[1];
 				output = lastFile.path.split('/');
 				output.pop();
 				var outputPath = output.join('/')+'/'+outputName;
-
-				gm(lastFile.path)
-				.autoOrient()
-				.resize(task.width, task.height, '^')
-				.gravity('Center')
-				.extent(task.width, task.height)
-				.write(outputPath, function (err) {
+				var quality = 95;
+				if(wrangler.config.imageQuality){
+					quality = wrangler.config.imageQuality;
+				}
+				var completionBlock = function (err) {
 					if (!err) {
 						responseObject[task.suffix] = wrangler.config.basePath+subDirPath+'/'+outputName;
 						var stat = fs.statSync(outputPath);
@@ -126,7 +154,22 @@ ImageWrangler.prototype.handle = function ( ctx, next ) {
 						console.log(' error writing: '+err);
 						ctx.done(err);
 					}
-				});
+				};
+				if (wrangler.config.crop) {
+					gm(lastFile.path)
+					.quality(quality)
+					.autoOrient()
+					.resize(task.width, task.height, '^')
+					.gravity('Center')
+					.extent(task.width, task.height)
+					.write(outputPath, completionBlock);
+				}else{
+					gm(lastFile.path)
+					.quality(quality)
+					.autoOrient()
+					.resize(task.width, task.height)
+					.write(outputPath, completionBlock);
+				}
 			}else{
 				if (req.headers.referer) {
 					ctx.done(null, responseObject);
@@ -141,7 +184,7 @@ ImageWrangler.prototype.handle = function ( ctx, next ) {
 			remaining++;
 			lastFile = file;
 			//write original version to s3 for safe keeping
-			var output = file.name.split('.');
+			var output = cleanseFilename(file.name).split('.');
 			var outputName = output[0]+'-original.'+output[1];
 			wrangler.uploadFile('/'+subDirPath+'/'+outputName, file.size, lastFile.type, fs.createReadStream(file.path), resizeFile);
 		})
