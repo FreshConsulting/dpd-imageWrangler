@@ -1,6 +1,6 @@
 {
   "name": "dpd-image-wrangler",
-  "version": "0.2.1",
+  "version": "0.2.3",
   "homepage": "https://github.com/UncorkedStudios/dpd-imageWrangler",
   "dependencies": {
     "gm": "~1.14.2",

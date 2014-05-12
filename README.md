@@ -1,4 +1,4 @@
-# dpd-image-wrangler v0.2.2
+# dpd-image-wrangler v0.2.3
 
 Deployd module that takes an image upload via POST and makes multiple resized versions of it, then places them on an AWS s3 bucket
 
